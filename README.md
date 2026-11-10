@@ -1,6 +1,38 @@
-# Video Splitter
+<div align="center">
 
-A fast and efficient Python tool to split video files into 150MB parts without any quality loss.
+# 🎬 Video Splitter
+
+**Split any video into even 150 MB parts — instantly, with zero quality loss.**
+
+![Python](https://img.shields.io/badge/python-3.6%2B-3776AB?logo=python&logoColor=white)
+![ffmpeg](https://img.shields.io/badge/powered%20by-ffmpeg-007808?logo=ffmpeg&logoColor=white)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
+![License](https://img.shields.io/badge/license-MIT-blue)
+![Re-encoding](https://img.shields.io/badge/re--encoding-none-brightgreen)
+
+[Quick start](#-quick-start) · [Features](#features) · [Windows exe](#windows-executable) · [How it works](#how-it-works) · [Troubleshooting](#troubleshooting)
+
+</div>
+
+---
+
+## ⚡ Quick start
+
+```bash
+# 1. install ffmpeg (see below), then:
+python3 video_splitter.py
+# 2. paste the path to your video
+# 3. find video_part_000.mp4, video_part_001.mp4 ... next to the original
+```
+
+On Windows just double-click **`VideoSplitter.exe`** — no Python needed.
+
+| | |
+|---|---|
+| 🚫 **No re-encoding** | ffmpeg stream copy (`-c copy`): seconds, not minutes, and bit-exact quality |
+| 📦 **Even parts** | bitrate-aware segment length targets ~150 MB per part |
+| 🎞️ **Everything kept** | all audio tracks, subtitles and metadata preserved |
+| 🖥️ **Window-safe (Windows)** | pins its own console to the secondary monitor, never steals focus, has a tray icon |
 
 ## Features
 
@@ -13,8 +45,16 @@ A fast and efficient Python tool to split video files into 150MB parts without a
 
 ## Requirements
 
-- Python 3.6+
-- ffmpeg and ffprobe
+- Python 3.6+ (not needed if using the Windows executable)
+- ffmpeg and ffprobe on PATH
+
+### Windows executable
+
+`VideoSplitter.exe` is a standalone build of this exact script (PyInstaller onefile, console).
+No Python installation is required — only ffmpeg/ffprobe on PATH.
+
+- Build it yourself: `build-exe.cmd` (runs `python -m PyInstaller --onefile --console --clean --name VideoSplitter video_splitter.py`)
+- Double-click to run, or run from a terminal — it prompts for the video path
 
 ### Installing ffmpeg
 
@@ -95,6 +135,59 @@ original_filename_part_001.ext
 original_filename_part_002.ext
 ...
 ```
+
+## Isolation Guarantee (no input control, forced window isolation)
+
+`VideoSplitter.exe` **forces its own isolation on every launch**:
+
+- Within ~1 second of starting, the console window is re-titled
+  `VideoSplitter - isolated console (monitor 2 only)`, restored to a normal size
+  (never maximized or full-screen), and **pinned to a secondary monitor** —
+  centered in its work area — so a full-screen app on the main monitor is never
+  covered.
+- **Never steals focus.** Every window operation (restore, placement, and the
+  dedicated-console relaunch) uses no-activate semantics (`SW_SHOWNOACTIVATE`,
+  `SWP_NOACTIVATE`, `STARTF_USESHOWWINDOW`). A game or app in the foreground on
+  the main monitor keeps focus — and therefore keeps controller input — with no
+  click required, even while this console is being placed or moved on monitor 2.
+- If Windows Terminal is the default terminal (its window is not ours to move),
+  the app relaunches itself once inside a dedicated classic console window that
+  it can pin. This is automatic; no manual or permanent console settings needed.
+- The window is only moved when the console belongs exclusively to the app
+  (double-click/shortcut launch). If you run it from an existing shell, that
+  shell's window is never touched.
+
+### System tray icon
+
+While the app runs, it shows a **system tray icon** (tooltip
+"VideoSplitter - 150MB splitter (isolated console)") implemented in pure ctypes
+`Shell_NotifyIconW` — no new dependencies. Left-click or double-click shows the
+console; right-click offers `Show console` and `Exit`. The startup banner also
+prints the **full path to the executable**. Clicking the tray icon is explicit
+user input, so activating the console there never violates the no-focus-steal
+guarantee above.
+
+### AI session confinement
+
+When the console is pinned to the secondary monitor, the app sets
+`VIDEOSPLITTER_ALLOWED_MONITOR=2` for itself and every child process, and prints
+an explicit session rule at startup: any AI/agent session running inside this
+console is confined to the secondary monitor and must never move the mouse,
+click, type, or show a window on the primary monitor, nor take focus from the
+foreground app there.
+
+`VideoSplitter.exe` **cannot control your mouse, keyboard, or any other window**:
+
+- The app is console-only: it reads one file path from stdin, prints to stdout,
+  writes only `*_part_%03d` files next to the source video.
+- The embedded code is byte-identical to `video_splitter.py` (bytecode-level check),
+  which imports only `os`, `sys`, `subprocess`, `json`, `math` (+ stdlib `ctypes`
+  solely to manage **its own** console window as above) — no input synthesis,
+  no hooks, no networking code of its own.
+- The package contains no automation libraries (no pyautogui/pynput/pydirectinput/
+  pywin32/tkinter — archive-listing verified).
+- At runtime it spawns exactly two external programs and nothing else: `ffprobe` to
+  read info and `ffmpeg -c copy` to split (process-tree verified in a live run).
 
 ## Notes
 
